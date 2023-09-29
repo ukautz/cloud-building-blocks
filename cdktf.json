@@ -1,0 +1,15 @@
+{
+  "language": "typescript",
+  "app": "npx ts-node main.ts",
+  "projectId": "30a809ea-51ee-4e0e-9c05-c7c2c9491420",
+  "sendCrashReports": "false",
+  "terraformProviders": [
+    {
+      "name": "hcloud",
+      "version": "~>1.43",
+      "source": "hetznercloud/hcloud"
+    }
+  ],
+  "terraformModules": [],
+  "context": {}
+}
