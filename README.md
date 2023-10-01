@@ -1,12 +1,12 @@
-# Cloud Building Blocks (CDKTF)
+# Cloud Building Blocks (PoC)
 
-This repository contains an experimental implementation of a higher-level IaC abstraction of cloud resources called "cloud building blocks" (CBB).
+This repository contains an experimental implementation of a higher-level IaC abstraction of cloud resources. These "cloud building blocks" (CBB) are primitive resources (like virtual machines, network, external IPs) with a common interface, that does not leak implementation details of specific vendors.
 
-The goal of this project is to make it possible to architect and reason about infrastructure independent of vendors.
+The goal of this project is to see whether / to what extend it is possible to architect and reason about cloud infrastructure independent of vendors. The rational, aside from circumventing lock-in, is to decouple implementation and design (details of vendor decisions all too often leak and detract).
 
-## Design
+## Design & Development
 
-Developer resources
+This is very, very early stage. At this point most mentions here are aspirational and incomplete:
 
 ### Tiers
 
@@ -27,3 +27,9 @@ CBB builds on the Terraform CDK (CDKTF).
 - **BuildingBlockContainer** - A CDKTF `Construct` that contains all CBB resources. It provides access to the provider and a `BuildingBlockManager`.
 - **BuildingBlockManager** - Implemented for each provider (currently: AWS and DigitalOcean)
 - **BuildingBlock** - Base class for all CBB resources
+
+## Todo
+
+- Finish up PoC for Digital Ocean manager implementation
+- Provide example implementation of higher level (L3 equivalent) constructs that build upon this
+- Consider integration into in-house landscape (hooks etc)
