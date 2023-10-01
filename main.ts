@@ -1,14 +1,22 @@
 import { AwsProvider } from "@cdktf/provider-aws/lib/provider";
-import { DigitaloceanProvider } from "@cdktf/provider-digitalocean/lib/provider";
-import { App, TerraformStack } from "cdktf";
+import { App, TerraformOutput, TerraformStack } from "cdktf";
 import { Construct } from "constructs";
-import * as hcloud from "./.gen/providers/hcloud";
+import {
+  BuildingBlockContainer,
+  BuildingBlockManager,
+  Disk,
+  Network,
+  VirtualMachine,
+  VirtualMachineArchitecture,
+  VirtualMachineImage,
+} from "./lib";
+import { AwsManager } from "./lib/manager/aws";
 
 class MyStack extends TerraformStack {
   constructor(scope: Construct, id: string) {
     super(scope, id);
 
-    var providers: String[] = [];
+    /* var providers: String[] = [];
     [
       new AwsProvider(this, "AwsProviderId"),
       new DigitaloceanProvider(this, "DigitalOceanProviderId"),
@@ -27,9 +35,55 @@ class MyStack extends TerraformStack {
         ].join("\n")
       );
     });
-    throw new Error(`provider is:\n${providers.join("\n\n")}`);
+    throw new Error(`provider is:\n${providers.join("\n\n")}`); */
 
     // define resources here
+
+    const awsProvider = new AwsProvider(this, "AwsProviderId", {
+      region: "eu-central-1",
+    });
+    const awsManager = new AwsManager(awsProvider, {
+      production: false,
+      //region: BuildingBlockRegion.Europe,
+      vendor: {},
+    });
+    new TheResources(this, "AwsResources", awsManager);
+
+    /* const digitalOceanProvider = new DigitaloceanProvider(
+      this,
+      "DigitalOceanProviderId"
+    );
+    new TheResources(this, "DigitalOceanResources", digitalOceanProvider, {
+      production: false,
+      //region: BuildingBlockRegion.Europe,
+      vendor: {},
+    }); */
+  }
+}
+
+class TheResources extends BuildingBlockContainer {
+  constructor(scope: Construct, id: string, manager: BuildingBlockManager) {
+    super(scope, id, manager);
+
+    const network = new Network(this, "PrivateNetwork", {
+      private: true,
+    });
+    const disk = new Disk(this, "Disk", {
+      size: 100,
+      device: "data",
+    });
+    const vm = new VirtualMachine(this, "VirtualMachine", {
+      disks: [disk],
+      networks: [network],
+      image: VirtualMachineImage.Ubuntu,
+      architecture: VirtualMachineArchitecture.Arm64,
+      cpus: 1,
+      memory: 1,
+    });
+
+    new TerraformOutput(this, "vm_id", {
+      value: vm.resource.providerId,
+    });
   }
 }
 

@@ -10,13 +10,16 @@ import {
   NetworkResource,
   VirtualMachineArchitecture,
   VirtualMachineConfig,
+  VirtualMachineImage,
   VirtualMachineResource,
+  isVirtualMachineImage,
 } from "../../blocks";
-import { BuildingBlockRegion } from "../../core";
 import { BuildingBlockManager, BuildingBlockManagerRegister } from "../core";
+import { selectInstanceType } from "../instance-type";
+import { AVAILABILITY_ZONES } from "./availability-zones";
 import { INSTANCE_TYPES } from "./instance-types";
 
-class AwsManager extends BuildingBlockManager {
+export class AwsManager extends BuildingBlockManager {
   /**
    * The appropriate AWS region is selected by availability (e.g.: there is only one region in Africa)
    * and then amount of available services, availability zones, local zones and wavelength zones as
@@ -27,7 +30,17 @@ class AwsManager extends BuildingBlockManager {
    * @returns Returns the region code for the selected region.
    */
   protected getRegion(): string {
-    switch (this.config.region) {
+    const region =
+      (this.provider as AwsProvider).region ??
+      process.env.AWS_REGION ??
+      process.env.AWS_DEFAULT_REGION;
+    if (!region) {
+      throw new Error(
+        "No AWS region provided in provider configuration or environment variables"
+      );
+    }
+    return region;
+    /* switch (this.config.region) {
       // AFRICA
       case (BuildingBlockRegion.Africa,
       BuildingBlockRegion.AfricaEast,
@@ -79,90 +92,9 @@ class AwsManager extends BuildingBlockManager {
       // This should never happen - it's an enum, why do I need to provide this?
       default:
         throw Error("unsupported region");
-    }
+    } */
   }
 
-  /**
-   * The appropriate AWS availability zone in the selected region
-   *
-   * TODO: opt-in to all regions, so can do:
-   * ```
-   * for region in $(aws ec2 describe-regions --all-regions | jq -r '.Regions[] | .RegionName'); do
-   *  echo -n "# $region"
-   *  aws ec2 describe-availability-zones --region "$region" | jq -r '.AvailabilityZones[] | select(.State == "available") | .ZoneName'
-   * done
-   * ```
-   *
-   *
-   * Until then:
-   * ```
-   * Africa (Cape Town)	af-south-1a, af-south-1b, af-south-1c
-   * Asia Pacific (Hong Kong)	ap-east-1a, ap-east-1b, ap-east-1c
-   * Asia Pacific (Tokyo)	ap-northeast-1a, ap-northeast-1b, ap-northeast-1c, ap-northeast-2d
-   * Asia Pacific (Seoul)	ap-northeast-2a, ap-northeast-2b, ap-northeast-2c, ap-northeast-2d
-   * Asia Pacific (Osaka)	ap-northeast-3a, ap-northeast-3b, ap-northeast-3c
-   * Asia Pacific (Mumbai)	ap-south-1a, ap-south-1b, ap-south-1c
-   * Asia Pacific (Hyderabad)	ap-south-2a, ap-south-2b, ap-south-2c
-   * Asia Pacific (Singapore)	ap-southeast-1a, ap-southeast-1b, ap-southeast-1c
-   * Asia Pacific (Sydney)	ap-southeast-2a, ap-southeast-2b, ap-southeast-2c
-   * Asia Pacific (Jakarta)	ap-southeast-3a, ap-southeast-3b, ap-southeast-3c
-   * Asia Pacific (Melbourne)	ap-southeast-4a, ap-southeast-4b, ap-southeast-4c
-   * Canada (Central)	ca-central-1a, ca-central-1b, ca-central-1c
-   * China (Beijing)	cn-north-1a, cn-north-1b, cn-north-1c
-   * China (Ningxia)	cn-northwest-1a, cn-northwest-1b, cn-northwest-1c
-   * Europe (Frankfurt)	eu-central-1a, eu-central-1b, eu-central-1c
-   * Europe (Zurich)	eu-central-2a, eu-central-2b, eu-central-2c
-   * Europe (Stockholm)	eu-north-1a, eu-north-1b, eu-north-1c
-   * Europe (Milan)	eu-south-1a, eu-south-1b, eu-south-1c
-   * Europe (Spain)	eu-south-2a, eu-south-2b, eu-south-2c
-   * Europe (Ireland)	eu-west-1a, eu-west-1b, eu-west-1c
-   * Europe (London)	eu-west-2a, eu-west-2b, eu-west-2c
-   * Europe (Paris)	eu-west-3a, eu-west-3b, eu-west-3c
-   * Middle East (UAE)	me-central-1a, me-central-1b, me-central-1c
-   * Middle East (Bahrain)	me-south-1a, me-south-1b, me-south-1c
-   * South America (Sao Paulo)	sa-east-1a, sa-east-1b, sa-east-1c
-   * US East (N. Virginia)	us-east-1a, us-east-1b, us-east-1c, us-east-1d, us-east-1e, us-east-1f
-   * US East (Ohio)	us-east-2a, us-east-2b, us-east-2c
-   * AWS GovCloud (US-East)	us-gov-east-1a, us-gov-east-1b, us-gov-east-1c
-   * AWS GovCloud (US-West)	us-gov-west-1a, us-gov-west-1b, us-gov-west-1c
-   * US West (N. California)	us-west-1a, us-west-1b, us-west-1c
-   * US West (Oregon)	us-west-2a, us-west-2b, us-west-2c, us-west-2d
-   * ```
-   *
-   */
-  protected static availabilityZones: { [key: string]: string[] } = {
-    "af-south-1": ["a", "b", "c"],
-    "ap-east-1": ["a", "b", "c"],
-    "ap-northeast-1": ["a", "b", "c", "d"],
-    "ap-northeast-2": ["a", "b", "c", "d"],
-    "ap-northeast-3": ["a", "b", "c"],
-    "ap-south-1": ["a", "b", "c"],
-    "ap-south-2": ["a", "b", "c"],
-    "ap-southeast-1": ["a", "b", "c"],
-    "ap-southeast-2": ["a", "b", "c"],
-    "ap-southeast-3": ["a", "b", "c"],
-    "ap-southeast-4": ["a", "b", "c"],
-    "ca-central-1": ["a", "b", "c"],
-    "cn-north-1": ["a", "b", "c"],
-    "cn-northwest-1": ["a", "b", "c"],
-    "eu-central-1": ["a", "b", "c"],
-    "eu-central-2": ["a", "b", "c"],
-    "eu-north-1": ["a", "b", "c"],
-    "eu-south-1": ["a", "b", "c"],
-    "eu-south-2": ["a", "b", "c"],
-    "eu-west-1": ["a", "b", "c"],
-    "eu-west-2": ["a", "b", "c"],
-    "eu-west-3": ["a", "b", "c"],
-    "me-central-1": ["a", "b", "c"],
-    "me-south-1": ["a", "b", "c"],
-    "sa-east-1": ["a", "b", "c"],
-    "us-east-1": ["a", "b", "c", "d", "e", "f"],
-    "us-east-2": ["a", "b", "c"],
-    "us-gov-e": ["a", "b", "c"],
-    "us-gov-w": ["a", "b", "c"],
-    "us-west-1": ["a", "b", "c"],
-    "us-west-2": ["a", "b", "c", "d"],
-  };
   protected getAvailabilityZone(num: number): string {
     if (num < 1) {
       throw new Error("availability zone must be greater than 0");
@@ -171,10 +103,10 @@ class AwsManager extends BuildingBlockManager {
       throw new Error("availability zone must be integer");
     }
     const awsRegion = this.getRegion();
-    if (!(awsRegion in AwsManager.availabilityZones)) {
+    if (!(awsRegion in AVAILABILITY_ZONES)) {
       throw new Error(`availability zone for region ${awsRegion} unknown`);
     }
-    const azs = AwsManager.availabilityZones[awsRegion];
+    const azs = AVAILABILITY_ZONES[awsRegion];
     if (num > azs.length) {
       throw new Error(
         `availability zone ${num} not available in region ${awsRegion}`
@@ -190,7 +122,7 @@ class AwsManager extends BuildingBlockManager {
     config?: NetworkConfig
   ): aws.dataAwsVpc.DataAwsVpc | aws.vpc.Vpc {
     if (!this.vpc) {
-      this.vpc = this.config.vendor.vpcId
+      this.vpc = this.config.vendor?.vpcId
         ? new aws.dataAwsVpc.DataAwsVpc(scope, "Vpc", {
             id: this.config.vendor.vpcId,
           })
@@ -211,7 +143,7 @@ class AwsManager extends BuildingBlockManager {
     const availabilityZone = this.getAvailabilityZone(
       config.availabilityZone ?? 1
     );
-    const subnet = new aws.subnet.Subnet(scope, id, {
+    const subnet = new aws.subnet.Subnet(scope, `${id}Subnet`, {
       provider: this.provider,
       vpcId: vpc.id,
       cidrBlock: config.cidr,
@@ -231,7 +163,7 @@ class AwsManager extends BuildingBlockManager {
     id: string,
     config: ExternalIpConfig
   ): ExternalIpResource {
-    const resource = new aws.eip.Eip(scope, id, {
+    const resource = new aws.eip.Eip(scope, `${id}Eip`, {
       provider: this.provider,
       domain: config.network ? "vpc" : "standard",
       address: config.ip,
@@ -252,7 +184,7 @@ class AwsManager extends BuildingBlockManager {
     const availabilityZone = this.getAvailabilityZone(
       config.availabilityZone ?? 1
     );
-    const volume = new aws.ebsVolume.EbsVolume(scope, id, {
+    const volume = new aws.ebsVolume.EbsVolume(scope, `${id}EbsVolume`, {
       provider: this.provider,
       size: config.size,
       availabilityZone,
@@ -267,16 +199,65 @@ class AwsManager extends BuildingBlockManager {
     };
   }
 
+  protected amiCache: { [key: string]: string } = {};
+
   /**
    * Returns an AMI identifier for the given operating system and, architecture in the current region.
    *
    * @param scope
    * @param config
    */
-  protected getVirtualMachineImageId(
-    scope: Construct,
-    config: VirtualMachineConfig
-  ): string {
+  protected getAMI(scope: Construct, config: VirtualMachineConfig): string {
+    // if an image is provided -> stop here
+    const vmImage = config.image;
+    if (!isVirtualMachineImage(vmImage)) {
+      return vmImage;
+    }
+
+    const arch =
+      VirtualMachineArchitecture[
+        config.architecture ?? VirtualMachineArchitecture.X86_64
+      ].toLowerCase();
+    const image = VirtualMachineImage[vmImage].toLowerCase();
+
+    // lookup images only once
+    const lookupName = [image, arch].join("-");
+    if (lookupName in this.amiCache) {
+      return this.amiCache[lookupName];
+    }
+
+    // search for image
+    let search: {
+      owners?: string[];
+      filters?: { name: string; values: string[] }[];
+    } = {};
+    switch (config.image as VirtualMachineImage) {
+      // windows: Windows_Server-2022-English-STIG-Full-* ??
+      case VirtualMachineImage.Ubuntu:
+        search.owners = ["amazon"];
+        search.filters = [
+          {
+            name: "name",
+            values: [
+              `ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-${arch}-server-*`,
+            ],
+          },
+        ];
+        break;
+    }
+
+    // found support search
+    if (search.filters) {
+      const ami = new aws.dataAwsAmi.DataAwsAmi(scope, `Ami${lookupName}`, {
+        ...search,
+        mostRecent: true,
+        provider: this.provider,
+      });
+      this.amiCache[lookupName] = ami.id;
+
+      return ami.id;
+    }
+
     // TODO: maintain a map of latest images per supported region per supported OS per supported architecture
     throw new Error(
       `Auto-selecting an image for ${config.image} (arch: ${
@@ -285,55 +266,17 @@ class AwsManager extends BuildingBlockManager {
     );
   }
 
-  /**
-   * Returns the instance size that is closest (equal or bigger) to the given memory, cpu and gpu requirements.
-   *
-   * @param scope
-   * @param config
-   */
-  protected getInstanceType(config: VirtualMachineConfig): string {
-    let arch =
-      VirtualMachineArchitecture[
-        config.architecture ?? VirtualMachineArchitecture.X86_64
-      ].toLocaleLowerCase();
-    let types = INSTANCE_TYPES.filter(
-      (instanceType) =>
-        instanceType.arch == arch &&
-        (!config.memory || instanceType.memory >= config.memory) &&
-        (!config.cpus || instanceType.cpus >= config.cpus) &&
-        (!config.gpus || instanceType.gpus >= config.gpus)
-    ).sort((a, b) => {
-      if (a.cpus > b.cpus) {
-        return 1;
-      } else if (a.cpus < b.cpus) {
-        return -1;
-      }
-      if (a.memory > b.memory) {
-        return 1;
-      } else if (a.memory < b.memory) {
-        return -1;
-      }
-      if (a.gpus > b.gpus) {
-        return 1;
-      } else if (a.gpus > b.gpus) {
-        return -1;
-      }
-      return 0;
-    });
-    if (types.length == 0) {
-      throw new Error(`No instance type found for ${config}`);
-    }
-    return types[0].name;
-  }
-
   public createVirtualMachine(
     scope: Construct,
     id: string,
     config: VirtualMachineConfig
   ): VirtualMachineResource {
+    // init AZ for checks
     const availabilityZone = this.getAvailabilityZone(
       config.availabilityZone ?? 1
     );
+
+    // all disks must be in same AZ
     config.disks?.forEach((disk) => {
       if (disk.resource.availabilityZone != availabilityZone) {
         throw new Error(
@@ -341,6 +284,8 @@ class AwsManager extends BuildingBlockManager {
         );
       }
     });
+
+    // all networks must be in same AZ
     config.networks?.forEach((network) => {
       if (network.resource.availabilityZone != availabilityZone) {
         throw new Error(
@@ -348,24 +293,40 @@ class AwsManager extends BuildingBlockManager {
         );
       }
     });
-    const ami =
-      typeof config.image == "string"
-        ? config.image
-        : this.getVirtualMachineImageId(scope, config);
-    const instance = new aws.instance.Instance(scope, id, {
+
+    // use machine image as provided or by selection (os + arch + ..)
+    const ami = this.getAMI(scope, config);
+
+    // create the instance
+    const instance = new aws.instance.Instance(scope, `${id}Instance`, {
       ami,
       availabilityZone,
-      instanceType: this.getInstanceType(config),
+      instanceType: selectInstanceType(
+        INSTANCE_TYPES,
+        config,
+        this.config.production
+      ),
+      ebsBlockDevice: config.disks
+        .sort((a, b) => (a.resource.device > b.resource.device ? 1 : -1))
+        .map((disk) => ({
+          deviceName: disk.resource.device,
+          volumeId: disk.resource.providerId,
+        })),
+      networkInterface: config.networks
+        .sort((a, b) => {
+          // must be sorted to give consistent `deviceIndex` below
+          return a.resource.cidr > b.resource.cidr ? 1 : -1;
+        })
+        .map((network, deviceIndex) => ({
+          networkInterfaceId: network.resource.providerId,
+          deviceIndex,
+        })),
     });
-    config.networks?.forEach((network) => {
-      new aws.networkInterface.NetworkInterface(
-        scope,
-        `${id}-${network.resource.providerId}`,
-        {
-          subnetId: network.resource.providerId,
-        }
-      );
-    });
+
+    return {
+      providerId: instance.id,
+      providerResource: instance,
+    };
   }
 }
 

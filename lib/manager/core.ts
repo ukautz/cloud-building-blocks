@@ -10,22 +10,27 @@ import {
   VirtualMachineConfig,
   VirtualMachineResource,
 } from "../blocks";
-import { BuildingBlockRegion } from "../core";
 
 export interface BuildingBlockManagerConfig {
   /**
    * Where the building blocks should be created.
    */
-  readonly region: BuildingBlockRegion;
+  //readonly region: BuildingBlockRegion;
+
+  /**
+   * Toggle for production mode. Allows the manager of the provider to select
+   * resources that are less expensive but not as reliable when not in production.
+   */
+  readonly production: boolean;
 
   /**
    * Vendor specific, arbitrary configuration.
    */
-  readonly vendor: { [key: string]: string };
+  readonly vendor?: { [key: string]: string };
 }
 
 export abstract class BuildingBlockManager {
-  protected readonly provider: TerraformProvider;
+  public readonly provider: TerraformProvider;
   protected readonly config: BuildingBlockManagerConfig;
 
   constructor(provider: TerraformProvider, config: BuildingBlockManagerConfig) {

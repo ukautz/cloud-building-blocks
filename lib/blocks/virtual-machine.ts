@@ -17,9 +17,27 @@ export enum VirtualMachineImage {
   Windows,
 }
 
+export function isVirtualMachineImage(
+  image: VirtualMachineImage | string
+): image is VirtualMachineImage {
+  return (
+    typeof image === "number" &&
+    Object.values(VirtualMachineImage).includes(image)
+  );
+}
+
 export enum VirtualMachineArchitecture {
   Arm64,
   X86_64,
+}
+
+export function isVirtualMachineArchitecture(
+  architecture: VirtualMachineArchitecture | string
+): architecture is VirtualMachineArchitecture {
+  return (
+    typeof architecture === "number" &&
+    Object.values(VirtualMachineArchitecture).includes(architecture)
+  );
 }
 
 export interface VirtualMachineConfig {
